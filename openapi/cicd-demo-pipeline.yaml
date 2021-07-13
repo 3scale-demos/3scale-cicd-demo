@@ -87,7 +87,7 @@ objects:
           value: ${ENDPOINT2TEST}          
 parameters:
 - name: GIT_REPO
-  value: https://github.com/sgutierr/3scale-cicd-demo.git
+  value: https://github.com/3scale-demos/3scale-cicd-demo.git
   required: true
 - name: GIT_BRANCH
   value: master
