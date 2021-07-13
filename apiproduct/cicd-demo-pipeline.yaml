@@ -1,0 +1,157 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  template: cicd-demo-api-pipeline
+metadata:
+  annotations:
+    description: 3scale API publishing Pipeline
+  name: cicd-demo-api-pipeline
+objects:
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      name: cicd-demo-api-pipeline
+    name: cicd-demo-api-pipeline
+  spec:
+    output: null
+    postCommit: null
+    resources: null
+    runPolicy: Serial
+    source:
+      type: None
+    source:
+      git:
+        uri: ${GIT_REPO}
+        ref: ${GIT_BRANCH}
+    strategy:
+      type: JenkinsPipeline
+      jenkinsPipelineStrategy:
+        jenkinsfilePath: apiproduct/Jenkinsfile
+        env:
+        - name: GIT_BRANCH
+          value: ${GIT_BRANCH}
+        - name: GIT_REPO
+          value: ${GIT_REPO}
+        - name: DEV_PRIVATE_BASE_URL
+          value: ${DEV_PRIVATE_BASE_URL}
+        - name: TEST_PRIVATE_BASE_URL
+          value: ${TEST_PRIVATE_BASE_URL}          
+        - name: PROD_PRIVATE_BASE_URL
+          value: ${PROD_PRIVATE_BASE_URL}
+        - name: DEV_PRODUCTION_PUBLIC_BASE_URL
+          value: ${DEV_PRODUCTION_PUBLIC_BASE_URL}
+        - name: DEV_STAGING_PUBLIC_BASE_URL
+          value: ${DEV_STAGING_PUBLIC_BASE_URL}
+        - name: TEST_PRODUCTION_PUBLIC_BASE_URL
+          value: ${TEST_PRODUCTION_PUBLIC_BASE_URL}
+        - name: TEST_STAGING_PUBLIC_BASE_URL
+          value: ${TEST_STAGING_PUBLIC_BASE_URL}
+        - name: PROD_PRODUCTION_PUBLIC_BASE_URL
+          value: ${PROD_PRODUCTION_PUBLIC_BASE_URL}
+        - name: PROD_STAGING_PUBLIC_BASE_URL
+          value: ${PROD_STAGING_PUBLIC_BASE_URL}
+        - name: API_BASE_SYSTEM_NAME
+          value: ${API_BASE_SYSTEM_NAME}
+        - name: DEV_PROJECT
+          value: ${DEV_PROJECT}
+        - name: TEST_PROJECT
+          value: ${TEST_PROJECT}
+        - name: PROD_PROJECT
+          value: ${PROD_PROJECT}
+        - name: IMAGE_NAMESPACE
+          value: ${IMAGE_NAMESPACE}
+        - name: SECRET_NAME
+          value: ${SECRET_NAME}
+        - name: TARGET_INSTANCE_DEV
+          value: ${TARGET_INSTANCE_DEV}
+        - name: TARGET_INSTANCE_TEST
+          value: ${TARGET_INSTANCE_TEST}
+        - name: TARGET_INSTANCE_PROD
+          value: ${TARGET_INSTANCE_PROD}
+        - name: DEV_DEVELOPER_ACCOUNT_ID
+          value: ${DEV_DEVELOPER_ACCOUNT_ID}
+        - name: TEST_DEVELOPER_ACCOUNT_ID
+          value: ${TEST_DEVELOPER_ACCOUNT_ID}
+        - name: PROD_DEVELOPER_ACCOUNT_ID
+          value: ${PROD_DEVELOPER_ACCOUNT_ID}
+        - name: DISABLE_TLS_VALIDATION
+          value: ${DISABLE_TLS_VALIDATION}
+        - name: APPLICATION_NAME
+          value: ${APPLICATION_NAME}
+        - name: OPENAPI_SPECIFICATION_FILE
+          value: ${OPENAPI_SPECIFICATION_FILE}
+        - name: TOOLBOX_IMAGE_REGISTRY
+          value: ${TOOLBOX_IMAGE_REGISTRY}
+        - name: ENDPOINT2TEST
+          value: ${ENDPOINT2TEST}          
+parameters:
+- name: GIT_REPO
+  value: https://github.com/sgutierr/3scale-cicd-demo.git
+  required: true
+- name: GIT_BRANCH
+  value: master
+  required: true
+- name: DEV_PRIVATE_BASE_URL
+  value: https://echo-api.3scale.net:443
+  required: true
+- name: TEST_PRIVATE_BASE_URL
+  value: https://echo-api.3scale.net:443
+  required: true
+- name: PROD_PRIVATE_BASE_URL
+  value: https://echo-api.3scale.net:443
+  required: true
+- name: DEV_PRODUCTION_PUBLIC_BASE_URL
+  value: 'https://payment-ser-dev-production.apps.my-cluster.ocp4.openshift.es'
+  required: true
+- name: DEV_STAGING_PUBLIC_BASE_URL
+  value: 'https://payment-ser-dev-staging.apps.my-cluster.ocp4.openshift.es'
+  required: true
+- name: TEST_PRODUCTION_PUBLIC_BASE_URL
+  value: 'https://payment-ser-test-production.apps.my-cluster.ocp4.openshift.es'
+  required: true
+- name: TEST_STAGING_PUBLIC_BASE_URL
+  value: 'https://payment-ser-test-staging.apps.my-cluster.ocp4.openshift.es'
+  required: true  
+- name: API_BASE_SYSTEM_NAME
+  value: payment_api
+  required: true
+- name: DEV_PROJECT
+  required: true
+  value: DEV
+- name: TEST_PROJECT
+  required: true
+  value: TEST
+- name: IMAGE_NAMESPACE
+  required: true
+- name: SECRET_NAME
+  value: 3scale-toolbox
+  required: true  
+- name: TARGET_INSTANCE_DEV
+  value: quitaladev
+  required: true  
+- name: TARGET_INSTANCE_TEST
+  value: quitalatest
+  required: true
+- name: DEV_DEVELOPER_ACCOUNT_ID
+  required: true
+  value: "54"
+- name: TEST_DEVELOPER_ACCOUNT_ID
+  required: true
+  value: "2445581796198"  
+- name: DISABLE_TLS_VALIDATION
+  value: "yes"
+- name: APPLICATION_NAME
+  value: "openbanking-api"
+  required: true
+- name: OPENAPI_SPECIFICATION_FILE
+  required: false   
+- name: TOOLBOX_IMAGE_REGISTRY
+  required: true
+  value: "quay.io/redhat/3scale-toolbox:latest"
+- name: ENDPOINT2TEST
+  required: true
+  value: "/api/health"  
+- name: PRODUCT_FILE
+  required: true
+    

@@ -1,0 +1,155 @@
+#!groovy
+
+// This CI/CD pipeline will execute within the container of a custom Jenkins image that includes the "3scale-toolbox-jenkins" shared library
+// Documentation pertaining to this shared library can be found here:
+//   1)  https://developers.redhat.com/blog/2019/07/31/using-the-3scale-toolbox-jenkins-shared-library/
+//   2)  https://github.com/rh-integration/3scale-toolbox-jenkins/blob/master/README.md
+
+// TO-DO:  Explain why doesn't this groovy functionality just come out of the box with the the 3scale toolbox container image ?
+library identifier: '3scale-toolbox-jenkins@master', 
+        retriever: modernSCM([$class: 'GitSCMSource',
+                              remote: 'https://github.com/sgutierr/3scale-toolbox-jenkins.git',
+                              traits: [[$class: 'jenkins.plugins.git.traits.BranchDiscoveryTrait']]])
+
+def service = null
+
+node() {
+  stage('Pre-requisites') {
+  }
+
+  stage('Checkout Source') {
+    checkout scm
+  }
+    def envName = params.DEV_PROJECT
+    def app_name= params.APPLICATION_NAME
+    def product_file= params.PRODUCT_FILE
+    def backend_service = params.DEV_PRIVATE_BASE_URL
+    def stagingPublicBaseURL = params.DEV_STAGING_PUBLIC_BASE_URL
+    def productionPublicBaseURL = params.DEV_PRODUCTION_PUBLIC_BASE_URL
+	
+  stage("Deploy API in Dev") {
+
+    // create the ThreescaleService object from your API metadata manifest:
+    service = toolbox.prepareThreescaleProduct(
+        product: [productfile: product_file],
+        environment: [ baseSystemName: params.API_BASE_SYSTEM_NAME,
+                       publicBasePath: "/open-data/",
+					   privateBaseUrl: "http://s1-appdev-integration.apps.ocp4.quitala.eu:80/services/s1",
+					   environmentName:  envName ],
+        toolbox: [ openshiftProject: params.NAMESPACE,
+                   destination: params.TARGET_INSTANCE_DEV,
+                   image: params.TOOLBOX_IMAGE_REGISTRY,
+                   insecure: params.DISABLE_TLS_VALIDATION == "yes",
+                   secretName: params.SECRET_NAME],
+        service: [:],
+        applications: [[:]],
+        applicationPlans: [[:]]
+    )
+
+    // Import Product
+    service.importProduct()
+    echo "Service with system_name ${service.environment.targetSystemName} created !"
+
+     // Create an Application
+    //service.applyApplication()
+	
+    // Wait for saving setup	  
+    //sleep(time:10,unit:"SECONDS")
+
+    // Run integration tests
+    //runIntegrationTests(service)
+    
+    // Promote to production
+    // service.promoteToProduction()	  
+
+ 
+  }
+	
+stage("Deploy API in TEST") {
+     
+    envName = params.TEST_PROJECT	
+    // create the ThreescaleService object from your API metadata manifest:
+    service = toolbox.prepareThreescaleProduct(
+        product: [productfile: product_file],
+        environment: [ baseSystemName: params.API_BASE_SYSTEM_NAME, environmentName:  envName ],
+        toolbox: [ openshiftProject: params.NAMESPACE,
+                   destination: params.TARGET_INSTANCE_TEST,
+                   image: params.TOOLBOX_IMAGE_REGISTRY,
+                   insecure: params.DISABLE_TLS_VALIDATION == "yes",
+                   secretName: params.SECRET_NAME],
+        service: [:],
+        applications: [[:]],
+        applicationPlans: [[:]]
+    )
+
+    // Import Product
+    service.importProduct()
+    echo "Service with system_name ${service.environment.targetSystemName} created !"
+
+    // Create an Application
+    //service.applyApplication()
+	
+    // Wait for saving setup	  
+    //sleep(time:10,unit:"SECONDS")
+
+    // Run integration tests
+    //runIntegrationTests(service)
+    
+    // Promote to production
+    // service.promoteToProduction()	  
+
+ 
+  }	
+
+ 
+}
+ 
+def runIntegrationTests(def service) {
+  // To run the integration tests when using APIcast SaaS instances, we need
+  // to fetch the proxy definition to extract the staging public url
+  def proxy = service.readProxy("sandbox")
+  def endpointTest = params.ENDPOINT2TEST
+  // The integration tests will be a bit different depending on the security scheme
+  // declared in the OpenAPI Specification file
+  def getCredentialsCodeSnippet = null
+  if (service.openapi.securityScheme.name() == "OPEN") {
+    getCredentialsCodeSnippet = """
+    credential_header="x-dummy: dummy"
+    echo "no credential will be used"
+    """
+  } else if (service.openapi.securityScheme.name() == "APIKEY") {
+	def userkey = service.applications[0].userkey
+	getCredentialsCodeSnippet = """
+	credential_header="api-key: ${userkey}"
+	echo "userkey is ${userkey}"
+	"""
+  } else if (service.openapi.securityScheme.name() == "OIDC") {
+    def tokenEndpoint = getTokenEndpoint(params.OIDC_ISSUER_ENDPOINT)
+    def clientId = service.applications[0].clientId
+    def clientSecret = service.applications[0].clientSecret
+    getCredentialsCodeSnippet = """
+    echo "token endpoint is ${tokenEndpoint}"
+    echo "client_id=${clientId}"
+    echo "client_secret=${clientSecret}"
+    curl -sfk "${tokenEndpoint}" -d client_id="${clientId}" -d client_secret="${clientSecret}" -d scope=openid -d grant_type=client_credentials -o response.json
+    curl -sLfk https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq
+    chmod 755 /tmp/jq
+    TOKEN="\$(/tmp/jq -r .access_token response.json)"
+    echo "Received access_token '\$TOKEN'"
+    credential_header="Authorization: Bearer \$TOKEN"
+    """
+  }
+
+  // Run the actual tests
+  sh """set -e
+  echo "Public Staging Base URL is ${proxy.sandbox_endpoint}"
+  ${getCredentialsCodeSnippet}
+  curl -sfk -w "Get Test List: %{http_code}\n" -o /dev/null "${proxy.sandbox_endpoint}/open-data${endpointTest}" -H "\$credential_header"
+  """
+
+}
+
+def getTokenEndpoint(String oidcIssuerEndpoint) {
+   def m = (oidcIssuerEndpoint =~ /(https?:\/\/)[^:]+:[^@]+@(.*)/)
+   return "${m[0][1]}${m[0][2]}/protocol/openid-connect/token"
+}
